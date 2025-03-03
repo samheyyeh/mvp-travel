@@ -1,9 +1,53 @@
-from transformers import pipeline
+#!/usr/bin/env python3
 
-prompt = input("prompt: ")
+import os
+import openai
+from openai import OpenAI
+from flask import Flask, render_template, request, jsonify
+from dotenv import load_dotenv
 
-pipe = pipeline("text-generation", model="perplexity-ai/r1-1776-distill-llama-70b")
+# Load environment variables from .env file
+load_dotenv()
 
-output = pipe(prompt, max_length=512, do_sample=True)
+# Initialize OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+if not client.api_key:
+    raise Exception("OpenAI API key not found. Please set it in your .env file.")
 
-print(output[0]['generated_text'])
+# Initialize Flask app
+app = Flask(__name__)
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.get_json()
+    user_message = data.get("message")
+    if not user_message:
+        return jsonify({"error": "No message provided."}), 400
+
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": ""
+                    
+                },
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.7,
+            max_tokens=1000
+        )
+
+        # Extract and return the response
+        bot_response = completion.choices[0].message.content.strip()
+        return jsonify({"response": bot_response})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(debug=True)
